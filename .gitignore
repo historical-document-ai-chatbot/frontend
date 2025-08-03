@@ -1,0 +1,83 @@
+# ---- Root Level ----
+
+# Python virtualenv
+venv/
+.env
+.env.*
+
+# Editor folders
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# ---- Backend (Python/FastAPI) ----
+
+__pycache__/
+*.py[cod]
+*$py.class
+
+# PyInstaller
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.cache
+.pytest_cache/
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+
+# Mypy
+.mypy_cache/
+
+# Pydantic settings
+.settings/
+
+# ---- Frontend (React + Vite + Node + TypeScript) ----
+
+# Node modules
+frontend/node_modules/
+
+# Production build
+frontend/dist/
+
+# Local env files
+frontend/.env
+frontend/.env.*
+
+# Vite cache
+frontend/.vite/
+
+# Yarn or npm logs
+frontend/yarn.lock
+frontend/package-lock.json
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+
+# TypeScript cache
+frontend/tsconfig.tsbuildinfo
+
+# IDE/Tooling
+frontend/.vscode/
+frontend/.eslintcache
+
+# ---- Optional: If using Docker ----
+*.pid
+docker-compose.override.yml
+docker-compose.dev.yml
+.dockerignore
+
+# ---- Optional: If using Poetry ----
+poetry.lock
