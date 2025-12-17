@@ -1,0 +1,21 @@
+.container {
+  display: flex; /* Enables Flexbox layout */
+  height: 100vh; /* Full viewport height */
+}
+
+.sidebar {
+  flex: 0 0 300px; /* Fixed width for the left side (300px) */
+  padding: 20px;
+  background-color: #f4f4f4;
+  border-right: 1px solid #ccc;
+  overflow-y: auto; /* Scrollable menu */
+}
+
+.main-content {
+  flex: 1; /* Takes up the remaining space */
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Add styling for the chat elements if you wish */
