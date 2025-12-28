@@ -1,111 +1,86 @@
-import React, { useEffect, useRef } from 'react';
-import { Message } from '../types';
-import { User, Bot, Loader2 } from 'lucide-react';
-import './MessageList.css';
+import React, { useEffect, useRef } from "react";
+import ReactMarkdown from "react-markdown";
+import { Message } from "../types";
+import { Bot, Sparkles, BookOpen, History } from "lucide-react"; // Make sure you have lucide-react installed
+import "./MessageList.css";
 
 interface MessageListProps {
   messages: Message[];
-  isLoading?: boolean;
+  isLoading: boolean;
 }
 
-const MessageList: React.FC<MessageListProps> = ({ messages, isLoading = false }) => {
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+const MessageList: React.FC<MessageListProps> = ({ messages, isLoading }) => {
+  const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    scrollToBottom();
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  const formatTime = (timestamp: Date) => {
-    return new Intl.DateTimeFormat('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    }).format(timestamp);
-  };
+  // --- THE NEW MODERN EMPTY STATE ---
+  if (messages.length === 0 && !isLoading) {
+    return (
+      <div className="empty-state-container">
+        <div className="empty-state-content">
+          <div className="icon-wrapper">
+            <Bot size={48} className="bot-icon" />
+          </div>
+          <h2 className="welcome-title">Welcome to Historical AI</h2>
+          <p className="welcome-subtitle">
+            Select a newspaper from the archive to start analyzing history.
+          </p>
+
+          <div className="features-grid">
+            <div className="feature-card">
+              <BookOpen className="feature-icon" />
+              <h3>Summarize</h3>
+              <p>Get concise summaries of long articles and reports.</p>
+            </div>
+            <div className="feature-card">
+              <Sparkles className="feature-icon" />
+              <h3>Analyze</h3>
+              <p>Extract key themes, sentiment, and historical context.</p>
+            </div>
+            <div className="feature-card">
+              <History className="feature-icon" />
+              <h3>Explore</h3>
+              <p>Ask about specific dates, people, or events in the text.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="message-list">
-      <div className="messages-container">
-        {messages.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-icon">
-              <Bot />
-            </div>
-            <h3 className="empty-title">Welcome to Chat AC</h3>
-            <p className="empty-description">
-              Select a newspaper from the dropdown above and start asking questions about its content.
-              I can help you analyze articles, summarize key points, and answer questions about the news.
-            </p>
-            <div className="empty-suggestions">
-              <p className="suggestions-title">Try asking:</p>
-              <ul className="suggestions-list">
-                <li>"What are the main topics covered in this newspaper?"</li>
-                <li>"Summarize the most important articles"</li>
-                <li>"What's the political stance on the infrastructure project?"</li>
-              </ul>
-            </div>
+      {messages.map((msg) => (
+        <div key={msg.id} className={`message-row ${msg.sender}`}>
+          <div className="avatar">
+            {msg.sender === "assistant" ? (
+              <Bot size={20} />
+            ) : (
+              <div className="user-avatar">U</div>
+            )}
           </div>
-        ) : (
-          messages.map((message) => (
-            <div
-              key={message.id}
-              className={`message ${message.sender}`}
-            >
-              <div className="message-avatar">
-                {message.sender === 'user' ? (
-                  <User className="avatar-icon" />
-                ) : (
-                  <Bot className="avatar-icon" />
-                )}
-              </div>
-              <div className="message-content">
-                <div className="message-bubble">
-                  {message.type === 'loading' ? (
-                    <div className="loading-message">
-                      <Loader2 className="loading-spinner" />
-                      <span>Thinking...</span>
-                    </div>
-                  ) : (
-                    <div className="message-text">
-                      {message.content}
-                    </div>
-                  )}
-                </div>
-                <div className="message-meta">
-                  <span className="message-time">
-                    {formatTime(message.timestamp)}
-                  </span>
-                  <span className="message-sender">
-                    {message.sender === 'user' ? 'You' : 'Assistant'}
-                  </span>
-                </div>
-              </div>
-            </div>
-          ))
-        )}
-        
-        {isLoading && (
-          <div className="message assistant">
-            <div className="message-avatar">
-              <Bot className="avatar-icon" />
-            </div>
-            <div className="message-content">
-              <div className="message-bubble">
-                <div className="loading-message">
-                  <Loader2 className="loading-spinner" />
-                  <span>Analyzing newspaper content...</span>
-                </div>
-              </div>
-            </div>
+          <div className="message-bubble">
+            <ReactMarkdown>{msg.content}</ReactMarkdown>
           </div>
-        )}
-        
-        <div ref={messagesEndRef} />
-      </div>
+        </div>
+      ))}
+
+      {isLoading && (
+        <div className="message-row assistant">
+          <div className="avatar">
+            <Bot size={20} />
+          </div>
+          <div className="message-bubble typing">
+            <span className="dot"></span>
+            <span className="dot"></span>
+            <span className="dot"></span>
+          </div>
+        </div>
+      )}
+      <div ref={bottomRef} />
     </div>
   );
 };

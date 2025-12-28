@@ -1,39 +1,35 @@
 export interface Message {
   id: string;
   content: string;
-  sender: 'user' | 'assistant';
+  sender: "user" | "assistant";
   timestamp: Date;
-  type?: 'text' | 'error' | 'loading';
+  type?: string;
 }
 
-export interface Newspaper {
+// What the backend returns for the sidebar list
+export interface NewspaperSummary {
   id: string;
-  title: string;
+  name: string;
   date: string;
-  source: string;
-  summary?: string;
-  articles: Article[];
+  // Added these so TypeScript knows they might exist after we format the data
+  displayDate?: string;
+  title?: string;
 }
 
-export interface Article {
-  id: string;
-  title: string;
-  content: string;
-  author?: string;
-  section?: string;
-  page?: number;
+// What the backend returns when you select a specific paper
+export interface NewspaperDetails extends NewspaperSummary {
+  full_json_data: {
+    Markdown: string;
+    Content: any[];
+    metadata: {
+      newspaper_name: string;
+      [key: string]: any;
+    };
+  };
 }
 
 export interface ChatState {
   messages: Message[];
-  selectedNewspaper: Newspaper | null;
   isLoading: boolean;
   error: string | null;
-}
-
-export interface NewspaperSelectorProps {
-  newspapers: Newspaper[];
-  selectedNewspaper: Newspaper | null;
-  onSelectNewspaper: (newspaper: Newspaper | null) => void;
-  isLoading?: boolean;
 }

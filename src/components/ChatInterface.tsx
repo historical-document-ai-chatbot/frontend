@@ -1,175 +1,294 @@
-import React, { useState, useEffect } from 'react';
-import { Message, Newspaper, ChatState } from '../types';
-import { fetchNewspapers } from '../data/mockData';
-import MessageList from './MessageList';
-import MessageInput from './MessageInput';
-import NewspaperSelector from './NewspaperSelector';
-import './ChatInterface.css';
+import React, { useState, useEffect } from "react";
+import { Message, NewspaperDetails, ChatState } from "../types";
+import MessageList from "./MessageList";
+import MessageInput from "./MessageInput";
+import NewspaperSelector from "./NewspaperSelector";
+import "./ChatInterface.css";
+
+const BACKEND_URL =
+  process.env.REACT_APP_BACKEND_URL || "http://127.0.0.1:8000";
+
+// --- HELPER: Date Formatter (e.g., "6th August 1904") ---
+const formatDate = (dateString: string) => {
+  if (!dateString) return "";
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return dateString; // Fallback if invalid
+
+  const day = date.getDate();
+  const month = date.toLocaleString("default", { month: "long" });
+  const year = date.getFullYear();
+
+  // Logic for st, nd, rd, th
+  const suffix =
+    day % 10 === 1 && day !== 11
+      ? "st"
+      : day % 10 === 2 && day !== 12
+      ? "nd"
+      : day % 10 === 3 && day !== 13
+      ? "rd"
+      : "th";
+
+  return `${day}${suffix} ${month} ${year}`;
+};
 
 const ChatInterface: React.FC = () => {
   const [chatState, setChatState] = useState<ChatState>({
     messages: [],
-    selectedNewspaper: null,
     isLoading: false,
-    error: null
+    error: null,
   });
-  const [newspapers, setNewspapers] = useState<Newspaper[]>([]);
-  const [loadingNewspapers, setLoadingNewspapers] = useState(true);
 
+  const [newspaperList, setNewspaperList] = useState<any[]>([]);
+  const [selectedNewspaper, setSelectedNewspaper] =
+    useState<NewspaperDetails | null>(null);
+  const [loadingList, setLoadingList] = useState(true);
+
+  // --- 1. LOAD NEWSPAPERS ---
   useEffect(() => {
-    loadNewspapers();
+    fetchNewspapers();
   }, []);
 
-  const loadNewspapers = async () => {
+  const fetchNewspapers = async () => {
     try {
-      setLoadingNewspapers(true);
-      const fetchedNewspapers = await fetchNewspapers();
-      setNewspapers(fetchedNewspapers);
-    } catch (error) {
-      console.error('Failed to load newspapers:', error);
-      setChatState(prev => ({
+      const res = await fetch(`${BACKEND_URL}/api/newspapers`);
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+
+      const data = await res.json();
+      console.log("Raw API Data:", data); // Debugging
+
+      // Robust mapping: Handle inconsistent field names from backend
+      const formattedData = data.map((item: any) => ({
+        ...item,
+        // Try 'name', then 'newspaper_name', then 'title', then fallback
+        title:
+          item.name ||
+          item.newspaper_name ||
+          item.title ||
+          "Untitled Newspaper",
+        // Format the date for the UI
+        displayDate: formatDate(item.date),
+        rawDate: item.date, // Keep original for logic if needed
+      }));
+
+      setNewspaperList(formattedData);
+    } catch (err: any) {
+      console.error(err);
+      setChatState((prev) => ({
         ...prev,
-        error: 'Failed to load newspapers'
+        error: `Could not load list: ${err.message}`,
       }));
     } finally {
-      setLoadingNewspapers(false);
+      setLoadingList(false);
     }
   };
 
-  const handleSelectNewspaper = (newspaper: Newspaper | null) => {
-    setChatState(prev => ({
-      ...prev,
-      selectedNewspaper: newspaper,
-      messages: newspaper ? prev.messages : [],
-      error: null
-    }));
-  };
+  // --- 2. HANDLE SELECTION ---
+  const handleSelectNewspaper = async (newspaper: any) => {
+    // 1. Safety Check: Ensure we have an ID to start with
+    if (!newspaper?.id) {
+      console.error("Selection failed: Missing ID", newspaper);
+      return;
+    }
 
-  const handleSendMessage = async (content: string) => {
-    if (!chatState.selectedNewspaper) return;
+    setChatState((prev) => ({ ...prev, isLoading: true, error: null }));
 
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      content,
-      sender: 'user',
-      timestamp: new Date(),
-      type: 'text'
-    };
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/newspaper/${newspaper.id}`);
+      if (!res.ok) throw new Error("Failed to load document details");
 
-    setChatState(prev => ({
-      ...prev,
-      messages: [...prev.messages, userMessage],
-      isLoading: true
-    }));
+      const data = await res.json();
 
-    // Simulate AI response
-    setTimeout(() => {
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: generateMockResponse(content, chatState.selectedNewspaper!),
-        sender: 'assistant',
-        timestamp: new Date(),
-        type: 'text'
+      // Merge the ID from the selection into the details
+      // The backend details response might be missing the 'id' field
+      const fullDetails = {
+        ...data,
+        id: newspaper.id, // FORCE THE ID HERE
+        title: data.name || data.newspaper_name || newspaper.title,
+        displayDate: formatDate(data.date),
       };
 
-      setChatState(prev => ({
+      console.log("Selected Newspaper set to:", fullDetails); // Debug log
+      setSelectedNewspaper(fullDetails);
+
+      setChatState({ messages: [], isLoading: false, error: null });
+    } catch (err) {
+      console.error(err);
+      setChatState((prev) => ({
         ...prev,
-        messages: [...prev.messages, assistantMessage],
-        isLoading: false
+        isLoading: false,
+        error: "Failed to load document.",
       }));
-    }, 1500);
+    }
   };
 
-  const generateMockResponse = (userMessage: string, newspaper: Newspaper): string => {
-    const message = userMessage.toLowerCase();
-    
-    if (message.includes('summar') || message.includes('overview')) {
-      return `Based on the "${newspaper.title}" from ${newspaper.date}, here are the key highlights:
-
-${newspaper.articles.map((article, index) => 
-  `${index + 1}. **${article.title}** (${article.section || 'General'})
-   ${article.content.substring(0, 150)}...`
-).join('\n\n')}
-
-The newspaper covers ${newspaper.articles.length} main articles focusing on ${newspaper.articles.map(a => a.section).filter(Boolean).join(', ')}. Would you like me to elaborate on any specific article?`;
+  // --- 3. SEND MESSAGE ---
+  const handleSendMessage = async (content: string) => {
+    // Validation: Ensure we have a valid ID before sending
+    if (!selectedNewspaper || !selectedNewspaper.id) {
+      setChatState((prev) => ({
+        ...prev,
+        error: "Error: No newspaper selected.",
+      }));
+      return;
     }
-    
-    if (message.includes('topic') || message.includes('subject')) {
-      const sections = Array.from(new Set(newspaper.articles.map(a => a.section).filter(Boolean)));
-      return `The main topics covered in "${newspaper.title}" include:
 
-${sections.map(section => `• **${section}**: ${newspaper.articles.filter(a => a.section === section).length} article(s)`)
-.join('\n')}
+    const userMsg: Message = {
+      id: Date.now().toString(),
+      content,
+      sender: "user",
+      timestamp: new Date(),
+    };
 
-The newspaper provides comprehensive coverage across these areas, with particular focus on ${sections[0] || 'general news'}.`;
+    setChatState((prev) => ({
+      ...prev,
+      messages: [...prev.messages, userMsg],
+      isLoading: true,
+    }));
+
+    try {
+      const payload = {
+        newspaper_id: selectedNewspaper.id,
+        message: content,
+        history: chatState.messages.map((m) => ({
+          sender: m.sender,
+          content: m.content,
+        })),
+      };
+
+      console.log("Sending Payload:", payload); // Debugging
+
+      const res = await fetch(`${BACKEND_URL}/api/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        // Try to read the error message from backend
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Server error ${res.status}`);
+      }
+
+      const data = await res.json();
+
+      const aiMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        content: data.response,
+        sender: "assistant",
+        timestamp: new Date(),
+      };
+
+      setChatState((prev) => ({
+        ...prev,
+        messages: [...prev.messages, aiMsg],
+        isLoading: false,
+      }));
+    } catch (err: any) {
+      console.error("Chat Error:", err);
+      setChatState((prev) => ({
+        ...prev,
+        isLoading: false,
+        error: `AI Error: ${err.message || "Check console"}`,
+      }));
     }
-    
-    if (message.includes('author') || message.includes('writer')) {
-      const authors = Array.from(new Set(newspaper.articles.map(a => a.author).filter(Boolean)));
-      return `The articles in "${newspaper.title}" are written by: ${authors.join(', ')}.
+  };
 
-Each author contributes their expertise to different sections of the newspaper, ensuring diverse perspectives and comprehensive coverage of the news.`;
+  const handleOpenMarkdown = () => {
+    if (!selectedNewspaper?.full_json_data?.Markdown) return;
+
+    const newWindow = window.open("", "_blank");
+    if (newWindow) {
+      // We inject a script (marked.js) to convert MD to HTML on the fly
+      newWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>${selectedNewspaper.title} - Full Text</title>
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/github-markdown-light.min.css">
+            <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+            <style>
+              body { box-sizing: border-box; min-width: 200px; max-width: 980px; margin: 0 auto; padding: 45px; }
+              @media (max-width: 767px) { body { padding: 15px; } }
+            </style>
+          </head>
+          <body class="markdown-body">
+            <div id="content">Loading document...</div>
+            <script>
+              const rawMarkdown = ${JSON.stringify(
+                selectedNewspaper.full_json_data.Markdown
+              )};
+              document.getElementById('content').innerHTML = marked.parse(rawMarkdown);
+            </script>
+          </body>
+        </html>
+      `);
+      newWindow.document.close();
     }
-    
-    return `I can help you analyze the "${newspaper.title}" newspaper from ${newspaper.date}. 
-
-This publication contains ${newspaper.articles.length} articles covering various topics. You can ask me to:
-- Summarize the main articles
-- Explain specific topics or themes
-- Provide details about authors and sections
-- Analyze the content structure
-
-What would you like to know more about?`;
   };
 
   return (
     <div className="chat-interface">
+      {/* HEADER (Cleaned up) */}
       <div className="chat-header">
         <div className="header-content">
-          <h1 className="chat-title">Chat AC</h1>
-          <p className="chat-subtitle">Newspaper Analysis Assistant</p>
+          {/* We use specific class names to help with CSS alignment */}
+          <h1 className="chat-title">
+            {selectedNewspaper ? selectedNewspaper.title : "Chat AC"}
+          </h1>
+          <p className="chat-subtitle">Historical Analysis Assistant</p>
         </div>
+        {/* Removed the button from here */}
       </div>
 
       <div className="chat-main">
+        {/* SIDEBAR */}
         <div className="chat-sidebar">
           <NewspaperSelector
-            newspapers={newspapers}
-            selectedNewspaper={chatState.selectedNewspaper}
+            newspapers={newspaperList}
+            selectedNewspaper={selectedNewspaper}
             onSelectNewspaper={handleSelectNewspaper}
-            isLoading={loadingNewspapers}
+            isLoading={loadingList}
           />
-          
-          {chatState.selectedNewspaper && (
+
+          {selectedNewspaper && (
             <div className="newspaper-details">
               <h3 className="details-title">Selected Newspaper</h3>
               <div className="details-content">
                 <div className="detail-item">
-                  <strong>Title:</strong> {chatState.selectedNewspaper.title}
+                  <strong>Title:</strong> {selectedNewspaper.title}
                 </div>
                 <div className="detail-item">
-                  <strong>Date:</strong> {chatState.selectedNewspaper.date}
+                  <strong>Date:</strong> {selectedNewspaper.displayDate}
                 </div>
-                <div className="detail-item">
-                  <strong>Source:</strong> {chatState.selectedNewspaper.source}
-                </div>
-                <div className="detail-item">
-                  <strong>Articles:</strong> {chatState.selectedNewspaper.articles.length}
-                </div>
+
+                {/* MOVED BUTTON HERE */}
+                <button
+                  onClick={handleOpenMarkdown}
+                  className="view-doc-btn"
+                  style={{
+                    marginTop: "15px",
+                    width: "100%",
+                    padding: "8px",
+                    cursor: "pointer",
+                  }}
+                >
+                  📄 Read Full Document
+                </button>
               </div>
             </div>
           )}
         </div>
 
+        {/* MESSAGES AREA */}
         <div className="chat-content">
-          <MessageList 
-            messages={chatState.messages} 
+          <MessageList
+            messages={chatState.messages}
             isLoading={chatState.isLoading}
           />
           <MessageInput
             onSendMessage={handleSendMessage}
             isLoading={chatState.isLoading}
-            selectedNewspaper={chatState.selectedNewspaper}
+            selectedNewspaper={selectedNewspaper as any}
           />
         </div>
       </div>
@@ -177,7 +296,7 @@ What would you like to know more about?`;
       {chatState.error && (
         <div className="error-banner">
           <span>{chatState.error}</span>
-          <button onClick={loadNewspapers} className="retry-button">
+          <button onClick={fetchNewspapers} className="retry-button">
             Retry
           </button>
         </div>
