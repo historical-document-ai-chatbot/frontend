@@ -21,8 +21,10 @@ jobs:
       # 3. Install dependencies
       - run: npm ci
 
-      # 4. Build CRA app
+      # 4. Build CRA app (UPDATED)
       - run: npm run build
+        env:
+          REACT_APP_BACKEND_URL: ${{ secrets.REACT_APP_BACKEND_URL }}
 
       # 5. Deploy to Firebase Hosting
       - uses: FirebaseExtended/action-hosting-deploy@v0
